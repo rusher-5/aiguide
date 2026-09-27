@@ -1,0 +1,82 @@
+{
+  "name": "l2d",
+  "type": "module",
+  "version": "2.1.1",
+  "description": "Loading Live2D in a browser is simpler.",
+  "author": {
+    "name": "Hacxy",
+    "email": "hacxy.js@outlook.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "Live2D",
+    "cubism2",
+    "cubism6",
+    "Live2D for Web"
+  ],
+  "main": "index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch --sourcemap",
+    "build": "vite build",
+    "docs:dev": "typedoc && vitepress dev docs",
+    "docs:build": "typedoc && npm run build && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "demo:dev": "vite __tests__",
+    "demo:build": "vite build && vite build --config vite.demo.config.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:staged": "eslint --fix",
+    "prepare": "simple-git-hooks",
+    "commit": "git-cz",
+    "release": "bump",
+    "typedoc": "typedoc"
+  },
+  "devDependencies": {
+    "@hacxy/bump": "^0.3.2",
+    "@hacxy/eslint-config": "^0.5.4",
+    "@hacxy/fe": "^0.6.1",
+    "@hacxy/tsconfig": "^0.1.0",
+    "@hacxy/utils": "^0.4.0",
+    "@iconify/vue": "^5.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "commitizen": "^4.3.1",
+    "cz-git": "^1.11.0",
+    "eslint": "^9.29.0",
+    "jsdom": "^29.0.1",
+    "lint-staged": "^15.4.3",
+    "naive-ui": "^2.42.0",
+    "simple-git-hooks": "^2.11.1",
+    "typedoc": "^0.28.18",
+    "typedoc-plugin-markdown": "^4.11.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.3",
+    "vite-plugin-dts": "^4.5.4",
+    "vitepress": "^1.6.3",
+    "vitepress-theme-mild": "0.8.4-beta.3",
+    "vitest": "^4.1.2",
+    "vue": "^3.5.13"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged",
+    "commit-msg": "npx fe msg"
+  },
+  "lint-staged": {
+    "*": [
+      "npm run lint:staged"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git",
+      "useEmoji": false
+    }
+  }
+}

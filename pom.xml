@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承Spring Boot父工程，统一管理依赖版本 -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.guide</groupId>
+    <artifactId>ai-guide-platform</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>ai-guide-platform</name>
+    <description>AI 智能导游数字人平台（Java 重写版，深度集成短链平台）</description>
+
+    <modules>
+        <module>guide-common</module>
+        <module>guide-dao</module>
+        <module>guide-service</module>
+        <module>guide-web</module>
+    </modules>
+
+    <properties>
+        <!-- 源码基于Java 17（JDK 25可正常交叉编译） -->
+        <java.version>17</java.version>
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <jieba.version>1.0.2</jieba.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块版本统一管理 -->
+            <dependency>
+                <groupId>com.guide</groupId>
+                <artifactId>guide-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.guide</groupId>
+                <artifactId>guide-dao</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.guide</groupId>
+                <artifactId>guide-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- 三方依赖版本管理 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.huaban</groupId>
+                <artifactId>jieba-analysis</artifactId>
+                <version>${jieba.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

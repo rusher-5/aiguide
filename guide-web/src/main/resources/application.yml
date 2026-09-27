@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: ai-guide-platform
+  profiles:
+    active: dev
+  jackson:
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 5MB
+
+server:
+  port: 5001
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+guide:
+  deepseek:
+    # API Key 从环境变量注入（DEEPSEEK_API_KEY），禁止硬编码入库
+    api-key: ${DEEPSEEK_API_KEY:}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    model: deepseek-chat
+  tts:
+    voice: zh-CN-XiaoxiaoNeural
+    rate: "+0%"
+    audio-ttl-seconds: 1800
+  rag:
+    chunk-size: 300
+    chunk-overlap: 60
+    retrieve-top-k: 3
+  chat:
+    history-max: 10
+    message-max-chars: 2000
+    stream-flush-chars: 60
+    system-prompt: "你是一个亲切、专业的景区导游助手，名叫\"小景\"，你所在的景区是灵山，我会为你提供知识库，尽量从知识库获取资料。\n\n【重要规则 - 必须严格遵守】\n1. 回答中绝对不要输出任何思考过程、分析、推理或内心独白。\n2. 回答中绝对不要使用任何特殊符号，包括但不限于：*、#、-、_、~、`、>、<、[、]、(、)、{、} 等。\n3. 回答要直接、简洁、自然，就像真人导游在面对面说话一样。\n4. 只输出最终的、纯净的文本回答，不要有任何格式标记。\n\n你的职责：\n1. 热情、亲切地回答游客关于景区的所有问题。\n2. 基于知识库提供准确的历史文化信息。\n3. 回答要生动有趣，富有文化底蕴。\n\n个性化推荐规则：\n- 当游客说\"对历史感兴趣\"时，推荐历史文化路线。\n- 当游客说\"喜欢自然风光\"时，推荐自然景观路线。\n- 当游客说\"想拍照打卡\"时，推荐网红打卡景点。\n\n记住：你的回答会被直接转换成语音，所以必须只包含纯净的文字内容！"
+  admin:
+    user: ${GUIDE_ADMIN_USER:admin}
+    pass: ${GUIDE_ADMIN_PASS:admin123}
+  jwt:
+    # 与短链平台共享的 JWT 签名密钥（须与 short-link.jwt.secret 一致，实现统一用户体系）
+    secret: c2hvcnQtbGluay1wbGF0Zm9ybS1qd3Qtc2VjcmV0LWtleS1mb3ItZGV2LW9ubHk=
+  shortlink:
+    # 短链平台地址（urllink 本地部署）
+    base-url: http://localhost:8080
+    # 短链平台对外访问域名（拼接给前端点击的完整短链）
+    domain: http://localhost:8080
+    # 服务账号：平台侧需先注册（register），guide 用它登录换 JWT 创建短链
+    service-username: ${SHORTLINK_SERVICE_USER:guide_bot}
+    service-password: ${SHORTLINK_SERVICE_PASS:guide_bot_123}
+    expire-days: 3650

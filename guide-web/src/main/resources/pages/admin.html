@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理后台 - AI 智能导游</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📊</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .header { background: #667eea; color: white; padding: 15px 30px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header a { color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { background: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s; }
+        .tab:hover { transform: translateY(-2px); }
+        .tab.active { background: #667eea; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .card h3 { margin-top: 0; color: #333; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f7f8fa; }
+        .btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-danger { background: #ff6b6b; color: white; }
+        .btn-primary { background: #667eea; color: white; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: inline-block; width: 120px; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group select { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .chart-container { height: 300px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .stat-box { background: #f7f8fa; border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-box .number { font-size: 28px; font-weight: bold; color: #667eea; }
+        .stat-box .label { color: #888; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏞️ 管理后台 - AI 智能导游</h1>
+        <div>
+            <a href="/" target="_blank">查看游客端</a>
+            <a href="/admin" style="margin-left:10px;">刷新</a>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="dashboard">📊 数据大屏</div>
+        <div class="tab" data-tab="knowledge">📚 知识库管理</div>
+        <div class="tab" data-tab="quickqa">⚡ 快问快答</div>
+        <div class="tab" data-tab="scene">📎 景点短链</div>
+        <div class="tab" data-tab="config">🤖 形象配置</div>
+        <div class="tab" data-tab="interactions">💬 交互记录</div>
+    </div>
+
+    <div id="tab-dashboard" class="tab-content active">
+        <div class="grid-2">
+            <div class="stat-box"><div class="number" id="totalCount">-</div><div class="label">总服务人次</div></div>
+            <div class="stat-box"><div class="number" id="todayCount">-</div><div class="label">今日服务人次</div></div>
+        </div>
+        <div class="card">
+            <h3>推荐→点击转化漏斗（短链点击统计，来自短链平台）</h3>
+            <table>
+                <thead><tr><th>景点</th><th>短链</th><th>累计 PV</th><th>累计 UV</th><th>今日点击</th></tr></thead>
+                <tbody id="sceneStatsList"></tbody>
+            </table>
+            <p style="color:#999;font-size:13px;">* 问答中命中景点关键词时自动下发短链卡片，游客点击经短链平台 302 跳转并计入统计</p>
+        </div>
+        <div class="card">
+            <h3>热门问题 TOP 5</h3>
+            <ul id="hotList" style="list-style:none; padding:0;"></ul>
+        </div>
+        <div class="card">
+            <h3>情感趋势（近7天，基于用户提问）</h3>
+            <div class="chart-container" id="trendChart"></div>
+        </div>
+    </div>
+
+    <div id="tab-knowledge" class="tab-content">
+        <div class="card">
+            <h3>上传知识文档（.txt）</h3>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>分类</label>
+                    <select name="category">
+                        <option value="历史">历史</option>
+                        <option value="文化">文化</option>
+                        <option value="景点">景点</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" name="file" accept=".txt" required>
+                </div>
+                <button type="submit" class="btn btn-primary">上传</button>
+                <span id="uploadMsg" style="margin-left:10px;"></span>
+            </form>
+            <p style="margin-top:10px;color:#999;">* 上传后自动分块并建立全文索引（jieba 关键词 + MySQL FULLTEXT ngram），无需重启</p>
+        </div>
+        <div class="card">
+            <h3>已有知识库</h3>
+            <table>
+                <thead><tr><th>ID</th><th>标题</th><th>分类</th><th>上传时间</th><th>操作</th></tr></thead>
+                <tbody id="knowledgeList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-config" class="tab-content">
+        <div class="card">
+            <h3>数字人形象配置</h3>
+            <form id="configForm">
+                <div class="form-group">
+                    <label>模型路径</label>
+                    <input type="text" name="model_path" id="cfg_model_path" style="width:300px;">
+                </div>
+                <div class="form-group">
+                    <label>缩放</label>
+                    <input type="number" name="scale" id="cfg_scale" step="0.1" value="1.0">
+                </div>
+                <div class="form-group">
+                    <label>水平位置</label>
+                    <input type="number" name="position_x" id="cfg_position_x" step="0.1" value="0">
+                </div>
+                <div class="form-group">
+                    <label>垂直位置</label>
+                    <input type="number" name="position_y" id="cfg_position_y" step="0.1" value="0">
+                </div>
+                <div class="form-group">
+                    <label>音量</label>
+                    <input type="number" name="volume" id="cfg_volume" step="0.1" min="0" max="1" value="0.5">
+                </div>
+                <button type="submit" class="btn btn-primary">保存配置</button>
+                <span id="configMsg" style="margin-left:10px;"></span>
+            </form>
+            <p style="margin-top:10px;color:#999;">* 修改后刷新游客端页面生效</p>
+        </div>
+    </div>
+
+    <div id="tab-interactions" class="tab-content">
+        <div class="card">
+            <h3>交互记录</h3>
+            <table>
+                <thead><tr><th>时间</th><th>用户问题</th><th>AI回答</th><th>情感</th></tr></thead>
+                <tbody id="interactionList"></tbody>
+            </table>
+            <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
+                <button class="btn btn-primary" id="prevPage">上一页</button>
+                <span id="pageInfo">第 1 页</span>
+                <button class="btn btn-primary" id="nextPage">下一页</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-quickqa" class="tab-content">
+        <div class="card">
+            <h3>新增快问快答</h3>
+            <form id="quickqaForm">
+                <div class="form-group">
+                    <label>问题</label>
+                    <input type="text" id="qa_question" placeholder="例：门票多少钱？" style="width:260px;">
+                </div>
+                <div class="form-group">
+                    <label>命中关键词</label>
+                    <input type="text" id="qa_keywords" placeholder="例：门票,票价,价格（逗号分隔，可空）" style="width:320px;">
+                </div>
+                <div class="form-group">
+                    <label>答案</label>
+                    <textarea id="qa_answer" placeholder="预制答案，命中后直接返回（不调用大模型）" style="width:520px;height:80px;padding:6px 12px;border:1px solid #ddd;border-radius:4px;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>排序（小在前）</label>
+                    <input type="number" id="qa_sort" value="99" style="width:100px;">
+                </div>
+                <button type="submit" class="btn btn-primary">新增</button>
+                <span id="quickqaMsg" style="margin-left:10px;"></span>
+            </form>
+            <p style="margin-top:10px;color:#999;">* 游客端「猜你想问」展示启用中的问题；提问命中问题原文或任一关键词时直接返回预制答案，不打扰大模型，响应毫秒级</p>
+        </div>
+        <div class="card">
+            <h3>已配置快问快答</h3>
+            <table>
+                <thead><tr><th>ID</th><th>问题</th><th>关键词</th><th>答案</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody id="quickqaList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-scene" class="tab-content">
+        <div class="card">
+            <h3>新增景点短链映射</h3>            <form id="sceneForm">
+                <div class="form-group">
+                    <label>景点名</label>
+                    <input type="text" id="scene_name" placeholder="例：灵山大佛" style="width:200px;">
+                </div>
+                <div class="form-group">
+                    <label>命中关键词</label>
+                    <input type="text" id="scene_keyword" placeholder="例：大佛,佛像（逗号分隔）" style="width:300px;">
+                </div>
+                <div class="form-group">
+                    <label>长链接</label>
+                    <input type="text" id="scene_long_url" placeholder="例：https://lingshan.com/dafu" style="width:400px;">
+                </div>
+                <button type="submit" class="btn btn-primary">新增</button>
+                <span id="sceneMsg" style="margin-left:10px;"></span>
+            </form>
+            <p style="margin-top:10px;color:#999;">* 游客问答命中关键词时，回答下方自动附带经短链平台生成的景点链接卡片；短码只创建一次并复用，统计持续聚合</p>
+        </div>
+        <div class="card">
+            <h3>已配置景点</h3>
+            <table>
+                <thead><tr><th>ID</th><th>景点名</th><th>关键词</th><th>长链接</th><th>短码</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody id="sceneList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let trendChart = null;
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                if (this.dataset.tab === 'dashboard') loadDashboard();
+                if (this.dataset.tab === 'knowledge') loadKnowledge();
+                if (this.dataset.tab === 'quickqa') loadQuickqa();
+                if (this.dataset.tab === 'scene') loadScenes();
+                if (this.dataset.tab === 'interactions') loadInteractions(1);
+                if (this.dataset.tab === 'config') loadConfig();
+            });
+        });
+
+        function loadConfig() {
+            fetch('/api/config')
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || body;   // 兼容 Result 包装
+                    document.getElementById('cfg_model_path').value = data.model_path;
+                    document.getElementById('cfg_scale').value = data.scale;
+                    document.getElementById('cfg_position_x').value = data.position_x;
+                    document.getElementById('cfg_position_y').value = data.position_y;
+                    document.getElementById('cfg_volume').value = data.volume;
+                });
+        }
+
+        document.getElementById('configForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const data = {
+                model_path: document.getElementById('cfg_model_path').value,
+                scale: parseFloat(document.getElementById('cfg_scale').value),
+                position_x: parseFloat(document.getElementById('cfg_position_x').value),
+                position_y: parseFloat(document.getElementById('cfg_position_y').value),
+                volume: parseFloat(document.getElementById('cfg_volume').value)
+            };
+            fetch('/api/admin/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+                .then(res => res.json())
+                .then(() => {
+                    document.getElementById('configMsg').textContent = '✅ 保存成功';
+                    setTimeout(() => document.getElementById('configMsg').textContent = '', 3000);
+                });
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/api/admin/knowledge/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        document.getElementById('uploadMsg').textContent = '✅ 上传并完成索引';
+                        loadKnowledge();
+                        this.reset();
+                    } else {
+                        document.getElementById('uploadMsg').textContent = '❌ ' + (res.message || '上传失败');
+                    }
+                });
+        });
+
+        function loadKnowledge() {
+            fetch('/api/admin/knowledge/list')
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || [];
+                    const tbody = document.getElementById('knowledgeList');
+                    tbody.innerHTML = data.map(item => `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${item.title}</td>
+                            <td>${item.category}</td>
+                            <td>${item.uploadTime}</td>
+                            <td><button class="btn btn-danger" onclick="deleteKnowledge(${item.id})">删除</button></td>
+                        </tr>
+                    `).join('');
+                });
+        }
+
+        function deleteKnowledge(id) {
+            if (!confirm('确定删除吗？将同时删除其分块与全文索引。')) return;
+            fetch('/api/admin/knowledge/' + id, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(() => loadKnowledge());
+        }
+
+        let currentPage = 1;
+        function loadInteractions(page) {
+            currentPage = page;
+            fetch('/api/admin/interactions?page=' + page)
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || {};
+                    const items = data.items || [];
+                    const tbody = document.getElementById('interactionList');
+                    tbody.innerHTML = items.map(item => `
+                        <tr>
+                            <td>${item.createTime}</td>
+                            <td>${item.userQuestion}</td>
+                            <td>${item.aiAnswer}</td>
+                            <td>${item.emotion}</td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('pageInfo').textContent = `第 ${data.page} 页 / 共 ${Math.ceil(data.total / data.per_page)} 页`;
+                    document.getElementById('prevPage').disabled = data.page <= 1;
+                    document.getElementById('nextPage').disabled = data.page >= Math.ceil(data.total / data.per_page);
+                });
+        }
+        document.getElementById('prevPage').addEventListener('click', () => { if (currentPage > 1) loadInteractions(currentPage - 1); });
+        document.getElementById('nextPage').addEventListener('click', () => loadInteractions(currentPage + 1));
+
+        function loadDashboard() {
+            fetch('/api/admin/dashboard')
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || {};
+                    document.getElementById('totalCount').textContent = data.total;
+                    document.getElementById('todayCount').textContent = data.today;
+                    // 推荐→点击转化漏斗（短链平台点击统计）
+                    const stats = data.sceneStats || [];
+                    document.getElementById('sceneStatsList').innerHTML = stats.length
+                        ? stats.map(s => `
+                            <tr>
+                                <td>${s.scene}</td>
+                                <td><a href="${s.shortUrl}" target="_blank" rel="noopener">${s.shortUrl}</a></td>
+                                <td>${s.pv}</td>
+                                <td>${s.uv}</td>
+                                <td>${s.todayPv}</td>
+                            </tr>
+                        `).join('')
+                        : '<tr><td colspan="5" style="color:#999;">暂无数据（先在「景点短链」页配置，再有问答命中）</td></tr>';
+                    const hotList = document.getElementById('hotList');
+                    const hot = data.hot || [];
+                    hotList.innerHTML = hot.map((item, idx) => `
+                        <li style="padding:6px 0;border-bottom:1px solid #eee;">${idx + 1}. ${item.question} (${item.cnt}次)</li>
+                    `).join('');
+                    const chartDom = document.getElementById('trendChart');
+                    if (!trendChart) trendChart = echarts.init(chartDom);
+                    const trend = data.trend || [];
+                    trendChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        legend: { data: ['正面', '负面', '中性'] },
+                        xAxis: { type: 'category', data: trend.map(d => d.day) },
+                        yAxis: { type: 'value' },
+                        series: [
+                            { name: '正面', type: 'line', data: trend.map(d => d.positive), smooth: true },
+                            { name: '负面', type: 'line', data: trend.map(d => d.negative), smooth: true },
+                            { name: '中性', type: 'line', data: trend.map(d => d.neutral), smooth: true }
+                        ]
+                    });
+                });
+        }
+
+        // ---------- 快问快答管理 ----------
+        function loadQuickqa() {
+            fetch('/api/admin/quick-qa/list')
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || [];
+                    document.getElementById('quickqaList').innerHTML = data.map(item => `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${item.question}</td>
+                            <td>${item.keywords || '<span style="color:#999;">按原文匹配</span>'}</td>
+                            <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(item.answer || '').replace(/"/g, '&quot;')}">${item.answer}</td>
+                            <td>${item.sortOrder}</td>
+                            <td>${item.enabled === 1 ? '✅ 启用' : '⛔ 禁用'}</td>
+                            <td>
+                                <button class="btn btn-primary" onclick="toggleQuickqa(${item.id})">${item.enabled === 1 ? '禁用' : '启用'}</button>
+                                <button class="btn btn-danger" onclick="deleteQuickqa(${item.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7" style="color:#999;">暂无配置</td></tr>';
+                });
+        }
+
+        document.getElementById('quickqaForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const payload = {
+                question: document.getElementById('qa_question').value.trim(),
+                keywords: document.getElementById('qa_keywords').value.trim() || null,
+                answer: document.getElementById('qa_answer').value.trim(),
+                sortOrder: parseInt(document.getElementById('qa_sort').value) || 99
+            };
+            if (!payload.question || !payload.answer) {
+                document.getElementById('quickqaMsg').textContent = '❌ 问题与答案必填';
+                return;
+            }
+            fetch('/api/admin/quick-qa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        document.getElementById('quickqaMsg').textContent = '✅ 已新增';
+                        this.reset();
+                        loadQuickqa();
+                    } else {
+                        document.getElementById('quickqaMsg').textContent = '❌ ' + (res.message || '新增失败');
+                    }
+                    setTimeout(() => document.getElementById('quickqaMsg').textContent = '', 3000);
+                });
+        });
+
+        function toggleQuickqa(id) {
+            fetch('/api/admin/quick-qa/' + id + '/toggle', { method: 'PUT' })
+                .then(res => res.json())
+                .then(() => loadQuickqa());
+        }
+
+        function deleteQuickqa(id) {
+            if (!confirm('确定删除该条快问快答吗？')) return;
+            fetch('/api/admin/quick-qa/' + id, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(() => loadQuickqa());
+        }
+
+        // ---------- 景点短链映射管理 ----------
+        function loadScenes() {
+            fetch('/api/admin/scene/list')
+                .then(res => res.json())
+                .then(body => {
+                    const data = body.data || [];
+                    document.getElementById('sceneList').innerHTML = data.map(item => `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${item.sceneName}</td>
+                            <td>${item.keyword}</td>
+                            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.longUrl}</td>
+                            <td>${item.shortCode || '<span style="color:#999;">未生成</span>'}</td>
+                            <td>${item.enabled === 1 ? '✅ 启用' : '⛔ 禁用'}</td>
+                            <td>
+                                <button class="btn btn-primary" onclick="toggleScene(${item.id})">${item.enabled === 1 ? '禁用' : '启用'}</button>
+                                <button class="btn btn-danger" onclick="deleteScene(${item.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                });
+        }
+
+        document.getElementById('sceneForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const payload = {
+                sceneName: document.getElementById('scene_name').value.trim(),
+                keyword: document.getElementById('scene_keyword').value.trim(),
+                longUrl: document.getElementById('scene_long_url').value.trim()
+            };
+            if (!payload.sceneName || !payload.keyword || !payload.longUrl) {
+                document.getElementById('sceneMsg').textContent = '❌ 请填写完整';
+                return;
+            }
+            fetch('/api/admin/scene', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        document.getElementById('sceneMsg').textContent = '✅ 已新增';
+                        this.reset();
+                        loadScenes();
+                    } else {
+                        document.getElementById('sceneMsg').textContent = '❌ ' + (res.message || '新增失败');
+                    }
+                    setTimeout(() => document.getElementById('sceneMsg').textContent = '', 3000);
+                });
+        });
+
+        function toggleScene(id) {
+            fetch('/api/admin/scene/' + id + '/toggle', { method: 'PUT' })
+                .then(res => res.json())
+                .then(() => loadScenes());
+        }
+
+        function deleteScene(id) {
+            if (!confirm('确定删除该景点映射吗？')) return;
+            fetch('/api/admin/scene/' + id, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(() => loadScenes());
+        }
+
+        window.addEventListener('resize', () => { if (trendChart) trendChart.resize(); });
+
+        loadDashboard();
+        loadConfig();
+    </script>
+</body>
+</html>

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能导游 · 灵山胜境</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏞️</text></svg>">
+    <script src="/static/libs/l2d/dist/index.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --ink: #1e2235;
+            --ink-soft: #6b7290;
+            --brand: #6366f1;
+            --brand-2: #8b5cf6;
+            --accent: #22d3ee;
+            --glass: rgba(255, 255, 255, 0.72);
+            --glass-strong: rgba(255, 255, 255, 0.9);
+            --bubble-ai: rgba(255, 255, 255, 0.92);
+            --shadow-lg: 0 24px 60px rgba(23, 20, 60, 0.18);
+        }
+        body {
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--ink);
+            min-height: 100vh;
+            background: linear-gradient(140deg, #eef2ff 0%, #fdf4ff 45%, #ecfeff 100%);
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        /* 氛围光斑 */
+        .orb { position: fixed; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+        .orb-1 { width: 480px; height: 480px; background: #c7d2fe; top: -160px; left: -120px; animation: drift 16s ease-in-out infinite alternate; }
+        .orb-2 { width: 420px; height: 420px; background: #f5d0fe; bottom: -140px; right: -100px; animation: drift 19s ease-in-out infinite alternate-reverse; }
+        .orb-3 { width: 300px; height: 300px; background: #a5f3fc; bottom: 10%; left: 12%; animation: drift 22s ease-in-out infinite alternate; }
+        @keyframes drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(40px, 30px) scale(1.08); } }
+
+        .app {
+            position: relative; z-index: 1;
+            display: grid; grid-template-columns: 340px 1fr; gap: 28px;
+            width: min(1080px, 94vw); height: min(720px, 92vh);
+        }
+
+        /* ---------- 左：数字人舞台 ---------- */
+        .stage {
+            background: linear-gradient(165deg, rgba(99,102,241,.16), rgba(139,92,246,.10) 55%, rgba(34,211,238,.10));
+            border: 1px solid rgba(255,255,255,.65);
+            border-radius: 28px; backdrop-filter: blur(18px);
+            box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .stage-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 4px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: .5px; }
+        .brand .logo {
+            width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 18px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff;
+            box-shadow: 0 6px 16px rgba(99,102,241,.4);
+        }
+        .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52,211,153,.6); animation: pulse 2s infinite; }
+        @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
+        #live2d-container { flex: 1; position: relative; min-height: 0; }
+        #live2d-container canvas { width: 100% !important; height: 100% !important; display: block; }
+        .stage-foot {
+            padding: 12px 20px 18px; display: flex; align-items: center; justify-content: center; gap: 8px;
+            color: var(--ink-soft); font-size: 13px;
+        }
+        .speaking { display: none; align-items: center; gap: 6px; color: var(--brand); font-weight: 600; }
+        .speaking.on { display: inline-flex; }
+        .speaking .wave { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+        .speaking .wave i { width: 3px; background: var(--brand); border-radius: 2px; animation: wave .9s ease-in-out infinite; }
+        .speaking .wave i:nth-child(1) { height: 6px; } .speaking .wave i:nth-child(2) { height: 11px; animation-delay: .15s; }
+        .speaking .wave i:nth-child(3) { height: 8px; animation-delay: .3s; } .speaking .wave i:nth-child(4) { height: 12px; animation-delay: .45s; }
+        @keyframes wave { 50% { transform: scaleY(.4); } }
+
+        /* ---------- 右：对话面板 ---------- */
+        .chat-panel {
+            background: var(--glass); border: 1px solid rgba(255,255,255,.7);
+            border-radius: 28px; backdrop-filter: blur(18px); box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .chat-head {
+            padding: 18px 24px; border-bottom: 1px solid rgba(30,34,53,.08);
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        }
+        .chat-head h1 { font-size: 18px; font-weight: 700; }
+        .chat-head p { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+        #status {
+            font-size: 12px; color: var(--ink-soft); white-space: nowrap;
+            background: rgba(255,255,255,.7); border: 1px solid rgba(30,34,53,.08);
+            padding: 7px 14px; border-radius: 999px; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .chat-box { flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+        .chat-box::-webkit-scrollbar { width: 6px; }
+        .chat-box::-webkit-scrollbar-thumb { background: rgba(99,102,241,.25); border-radius: 3px; }
+
+        .msg-row { display: flex; gap: 10px; align-items: flex-start; animation: rise .35s ease both; }
+        .msg-row.user { flex-direction: row-reverse; }
+        @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .avatar {
+            width: 34px; height: 34px; border-radius: 12px; flex: none; display: grid; place-items: center; font-size: 17px;
+            box-shadow: 0 4px 10px rgba(23,20,60,.12);
+        }
+        .avatar.ai { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; }
+        .avatar.me { background: #fff; border: 1px solid rgba(30,34,53,.08); }
+        .bubble-wrap { max-width: 76%; display: flex; flex-direction: column; gap: 5px; }
+        .msg-row.user .bubble-wrap { align-items: flex-end; }
+        .name { font-size: 11px; color: var(--ink-soft); padding: 0 4px; }
+        .bubble {
+            padding: 11px 15px; border-radius: 18px; font-size: 14.5px; line-height: 1.65;
+            white-space: pre-wrap; word-break: break-word; position: relative;
+        }
+        .msg-row.ai .bubble { background: var(--bubble-ai); border: 1px solid rgba(255,255,255,.9); border-top-left-radius: 6px; box-shadow: 0 4px 14px rgba(23,20,60,.06); }
+        .msg-row.user .bubble { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; border-top-right-radius: 6px; box-shadow: 0 6px 16px rgba(99,102,241,.35); }
+        .typing-cursor { display: inline-block; width: 2.5px; height: 1em; background: var(--brand); margin-left: 2px; vertical-align: text-bottom; animation: blink .8s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* 「AI 思考中」三点动画 */
+        .thinking { display: inline-flex; gap: 5px; padding: 4px 2px; }
+        .thinking i { width: 7px; height: 7px; border-radius: 50%; background: #a5b4fc; animation: bounce 1.2s infinite; }
+        .thinking i:nth-child(2) { animation-delay: .15s; } .thinking i:nth-child(3) { animation-delay: .3s; }
+        @keyframes bounce { 0%,60%,100% { transform: none; opacity: .5; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+        /* 秒回徽标 */
+        .quick-badge {
+            display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #b45309;
+            background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #fcd34d;
+            padding: 2px 9px; border-radius: 999px; margin-left: 8px; vertical-align: middle;
+        }
+
+        .link-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .link-card {
+            display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+            background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: #4c5bd4;
+            padding: 8px 15px; border-radius: 14px; font-size: 13.5px; font-weight: 600;
+            border: 1px solid #c7d2fe; transition: all .2s;
+        }
+        .link-card:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(99,102,241,.25); }
+        .link-card.degraded { background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #b45309; border-color: #fcd34d; }
+
+        /* ---------- 猜你想问 ---------- */
+        .chips {
+            display: flex; gap: 8px; padding: 10px 20px 4px; overflow-x: auto; scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+        .chips:empty { display: none; }
+        .chip {
+            flex: none; display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(255,255,255,.85); border: 1px solid rgba(99,102,241,.28); color: #4c5bd4;
+            font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+            transition: all .18s; user-select: none;
+        }
+        .chip:hover { background: var(--brand); color: #fff; border-color: var(--brand); transform: translateY(-1px); box-shadow: 0 5px 12px rgba(99,102,241,.35); }
+
+        /* ---------- 输入区 ---------- */
+        .input-area { padding: 12px 20px 20px; }
+        .input-box {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--glass-strong); border: 1.5px solid rgba(99,102,241,.22);
+            border-radius: 999px; padding: 6px 6px 6px 20px;
+            box-shadow: 0 8px 24px rgba(23,20,60,.08); transition: border-color .2s, box-shadow .2s;
+        }
+        .input-box:focus-within { border-color: var(--brand); box-shadow: 0 8px 28px rgba(99,102,241,.22); }
+        .input-box input { flex: 1; border: none; outline: none; background: none; font-size: 15px; color: var(--ink); }
+        .input-box input::placeholder { color: #a8aec8; }
+        .icon-btn {
+            width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; font-size: 17px;
+            display: grid; place-items: center; transition: all .2s; flex: none;
+        }
+        .btn-mic { background: rgba(255,235,235,.9); color: #ef4444; }
+        .btn-mic:hover { background: #fecaca; transform: scale(1.06); }
+        .btn-mic.rec { background: #ef4444; color: #fff; animation: pulse 1.2s infinite; }
+        .btn-send { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; box-shadow: 0 6px 16px rgba(99,102,241,.4); }
+        .btn-send:hover:not(:disabled) { transform: scale(1.06); box-shadow: 0 8px 20px rgba(99,102,241,.5); }
+        .btn-send:disabled { opacity: .55; cursor: not-allowed; }
+
+        @media (max-width: 860px) {
+            body { overflow: auto; align-items: flex-start; }
+            .app { grid-template-columns: 1fr; height: auto; }
+            .stage { height: 380px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+
+    <main class="app">
+        <!-- 左：数字人舞台 -->
+        <section class="stage">
+            <div class="stage-head">
+                <div class="brand"><span class="logo">🏞️</span>灵山数字导览</div>
+                <span class="pulse-dot" title="服务在线"></span>
+            </div>
+            <div id="live2d-container"></div>
+            <div class="stage-foot">
+                <span class="speaking" id="speakingTip"><span class="wave"><i></i><i></i><i></i><i></i></span>正在讲解…</span>
+                <span id="modelTip">导游小景 · 实时语音</span>
+            </div>
+        </section>
+
+        <!-- 右：对话 -->
+        <section class="chat-panel">
+            <div class="chat-head">
+                <div>
+                    <h1>AI 智能导游</h1>
+                    <p>知识库问答 · 流式语音 · 猜你想问秒回</p>
+                </div>
+                <div id="status">✅ 就绪</div>
+            </div>
+
+            <div class="chat-box" id="chatBox">
+                <div class="msg-row ai">
+                    <div class="avatar ai">🧭</div>
+                    <div class="bubble-wrap">
+                        <span class="name">小景</span>
+                        <div class="bubble">你好呀！我是导游小景 🏮 关于灵山胜境的门票、路线、开放时间都可以问我，点下方的问题也能秒回哦～</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chips" id="chips"></div>
+
+            <div class="input-area">
+                <div class="input-box">
+                    <input type="text" id="inputText" placeholder="问我任何关于灵山胜境的问题…" autocomplete="off">
+                    <button class="icon-btn btn-mic" id="micBtn" onclick="toggleMic()" title="语音提问">🎤</button>
+                    <button class="icon-btn btn-send" id="sendBtn" onclick="sendText()" title="发送">➤</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ==================== Live2D ====================
+        let viewer = null;
+        let ready = false;
+        const MODEL_PATH = '/static/models/hiyori/hiyori_pro_t11.model3.json';
+
+        function initLive2D() {
+            const container = document.getElementById('live2d-container');
+            const canvas = document.createElement('canvas');
+            canvas.width = 340; canvas.height = 460;
+            container.appendChild(canvas);
+
+            viewer = L2D.init(canvas);
+            if (!viewer) { setStatus('⚠️ 初始化失败'); return; }
+
+            fetch('/api/config').then(r => r.json()).then(resp => {
+                const config = resp.data || resp;
+                viewer.load({
+                    path: config.model_path, scale: config.scale,
+                    position: [config.position_x, config.position_y],
+                    volume: config.volume, logLevel: 'warn'
+                });
+            }).catch(() => viewer.load({ path: MODEL_PATH, scale: 1.0, position: [0, 0], volume: 0.5, logLevel: 'warn' }));
+
+            viewer.on('loaded', () => { ready = true; });
+            viewer.on('error', () => setStatus('⚠️ 模型加载失败'));
+        }
+        window.addEventListener('DOMContentLoaded', () => { initLive2D(); loadChips(); });
+
+        function setLipSync(value) {
+            if (viewer && ready) viewer.setParams({ ParamMouthOpenY: value });
+            document.getElementById('speakingTip').classList.toggle('on', value > 0.08);
+        }
+
+        // ==================== 猜你想问 ====================
+        async function loadChips() {
+            try {
+                const resp = await fetch('/api/chat/quick-qa');
+                const body = await resp.json();
+                const items = (body.data || []);
+                const box = document.getElementById('chips');
+                for (const item of items) {
+                    const chip = document.createElement('span');
+                    chip.className = 'chip';
+                    chip.textContent = '💡 ' + item.question;
+                    chip.onclick = () => { ask(item.question); };
+                    box.appendChild(chip);
+                }
+            } catch (e) { /* chips 是增强功能，失败静默 */ }
+        }
+
+        // ==================== 对话 ====================
+        const chatBox = document.getElementById('chatBox');
+        const inputText = document.getElementById('inputText');
+        const sendBtn = document.getElementById('sendBtn');
+        let history = [];
+
+        function setStatus(text) { document.getElementById('status').textContent = text; }
+
+        function addRow(role, initialHTML) {
+            const row = document.createElement('div');
+            row.className = 'msg-row ' + role;
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar ' + (role === 'user' ? 'me' : 'ai');
+            avatar.textContent = role === 'user' ? '🙋' : '🧭';
+            const wrap = document.createElement('div');
+            wrap.className = 'bubble-wrap';
+            const name = document.createElement('span');
+            name.className = 'name';
+            name.textContent = role === 'user' ? '我' : '小景';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = initialHTML || '';
+            wrap.appendChild(name); wrap.appendChild(bubble);
+            row.appendChild(avatar); row.appendChild(wrap);
+            chatBox.appendChild(row);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return bubble;
+        }
+
+        function addLinkCards(bubble, items) {
+            const wrap = document.createElement('div');
+            wrap.className = 'link-cards';
+            for (const item of items) {
+                const a = document.createElement('a');
+                a.href = item.shortUrl || item.longUrl;
+                a.target = '_blank'; a.rel = 'noopener';
+                a.className = 'link-card' + (item.degraded ? ' degraded' : '');
+                a.textContent = (item.degraded ? '🔗 ' : '📎 ') + item.scene;
+                if (item.degraded) a.title = '短链服务暂不可用，已降级为直链';
+                wrap.appendChild(a);
+            }
+            bubble.appendChild(wrap);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // ==================== 流式音频队列 ====================
+        let audioQueue = {}, nextSeq = 0, playing = false;
+
+        function enqueueAudio(seq, url) { audioQueue[seq] = url; pumpQueue(); }
+        function pumpQueue() {
+            if (playing) return;
+            const url = audioQueue[nextSeq];
+            if (url === undefined) return;
+            if (url === null) { nextSeq++; pumpQueue(); return; }
+            playing = true;
+            playAudioWithMouth(url, () => { playing = false; nextSeq++; pumpQueue(); });
+        }
+
+        function playAudioWithMouth(audioUrl, onEnded) {
+            const audio = new Audio(audioUrl);
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaElementSource(audio);
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser); analyser.connect(audioContext.destination);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let frameId = null;
+
+            function updateMouth() {
+                if (!audio.paused && !audio.ended) {
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    let value = sum / dataArray.length / 255;
+                    if (value < 0.05) value = 0;
+                    setLipSync(Math.min(value * 1.8, 1.0));
+                    frameId = requestAnimationFrame(updateMouth);
+                } else { setLipSync(0); if (frameId) cancelAnimationFrame(frameId); }
+            }
+            audio.addEventListener('play', () => audioContext.resume().then(() => updateMouth()).catch(() => {}));
+            audio.addEventListener('ended', () => { setLipSync(0); if (frameId) cancelAnimationFrame(frameId); onEnded(); });
+            audio.addEventListener('error', () => { setLipSync(0); onEnded(); });
+            audio.play().catch(() => {
+                setStatus('🔇 点一下页面任意处即可开启声音');
+                document.addEventListener('click', () => audio.play().catch(() => {}), { once: true });
+            });
+        }
+
+        // ==================== 发送（chips 与手动输入共用入口）====================
+        function ask(text) {
+            inputText.value = text;
+            sendText();
+        }
+
+        async function sendText() {
+            const text = inputText.value.trim();
+            if (!text || sendBtn.disabled) return;
+
+            inputText.value = '';
+            addRow('user', escapeHtml(text));
+            const answerBubble = addRow('ai', '<span class="thinking"><i></i><i></i><i></i></span>');
+            sendBtn.disabled = true;
+            setStatus('⏳ AI 思考中…');
+            audioQueue = {}; nextSeq = 0; playing = false;
+
+            let answerText = '', pendingLinks = null, isQuick = false;
+            let firstTextAt = 0, firstAudioAt = 0;
+            const t0 = performance.now();
+
+            try {
+                const resp = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: text, history: history })
+                });
+                if (!resp.ok || !resp.body) throw new Error('stream unavailable');
+
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let sseBuf = '';
+                answerBubble.innerHTML = '<span class="typing-cursor"></span>';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    sseBuf += decoder.decode(value, { stream: true });
+
+                    const events = sseBuf.split('\n\n');
+                    sseBuf = events.pop();
+                    for (const evt of events) {
+                        let eventName = 'message', dataLines = [];
+                        for (const line of evt.split('\n')) {
+                            // SSE 冒号后空格可选：Flask 带、Spring SseEmitter 不带，两种都兼容
+                            if (line.startsWith('event:')) eventName = line.slice(6).trim();
+                            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+                        }
+                        if (!dataLines.length) continue;
+                        const data = JSON.parse(dataLines.join('\n'));
+
+                        if (eventName === 'text') {
+                            if (!firstTextAt) firstTextAt = performance.now() - t0;
+                            answerText += data.delta;
+                            answerBubble.textContent = answerText;
+                            answerBubble.appendChild(Object.assign(document.createElement('span'), { className: 'typing-cursor' }));
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                            setStatus('💬 回答生成中，语音同步播放…');
+                        } else if (eventName === 'audio') {
+                            if (!firstAudioAt) firstAudioAt = performance.now() - t0;
+                            enqueueAudio(data.seq, data.url);
+                        } else if (eventName === 'links') {
+                            if (data.items && data.items.length) pendingLinks = data.items;
+                        } else if (eventName === 'error') {
+                            answerText = data.message;
+                            answerBubble.textContent = answerText;
+                            setStatus('❌ 出错了');
+                        } else if (eventName === 'done') {
+                            answerText = data.answer || answerText;
+                            isQuick = !!data.quick;
+                            answerBubble.textContent = '';
+                            answerBubble.append(answerText);
+                            if (isQuick) {
+                                const badge = document.createElement('span');
+                                badge.className = 'quick-badge';
+                                badge.textContent = '⚡ 秒回';
+                                answerBubble.appendChild(badge);
+                            }
+                            if (pendingLinks && pendingLinks.length) { addLinkCards(answerBubble, pendingLinks); pendingLinks = null; }
+                            history.push({ role: 'user', content: text });
+                            history.push({ role: 'assistant', content: answerText });
+                            setStatus('✅ ' + (isQuick ? '秒回' : '回复完成') +
+                                ' (首字 ' + Math.round(firstTextAt) + 'ms' +
+                                (firstAudioAt ? ' / 首音 ' + Math.round(firstAudioAt) + 'ms' : '') + ')');
+                        }
+                    }
+                }
+            } catch (e) {
+                // 流式失败 → 降级一次性接口
+                setStatus('⏳ 流式不可用，降级为普通模式…');
+                try {
+                    const resp = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: text, history: history })
+                    });
+                    const body = await resp.json();
+                    const data = body.data || body;
+                    if (data.answer) {
+                        answerBubble.textContent = data.answer;
+                        if (data.links && data.links.length) addLinkCards(answerBubble, data.links);
+                        history.push({ role: 'user', content: text });
+                        history.push({ role: 'assistant', content: data.answer });
+                        setStatus('✅ 回复完成（普通模式）');
+                        if (data.audio_url) enqueueAudio(0, data.audio_url);
+                    } else {
+                        answerBubble.textContent = '出错了，请重试';
+                        setStatus('❌ 出错了');
+                    }
+                } catch (e2) {
+                    answerBubble.textContent = '网络错误';
+                    setStatus('❌ 网络错误: ' + e2.message);
+                }
+            }
+            sendBtn.disabled = false;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== 语音提问 ====================
+        function toggleMic() {
+            if (!('webkitSpeechRecognition' in window)) { setStatus('❌ 浏览器不支持语音识别'); return; }
+            const micBtn = document.getElementById('micBtn');
+            micBtn.classList.add('rec');
+            setStatus('🎤 请说话…');
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.maxAlternatives = 1;
+            recognition.onresult = function (event) { ask(event.results[0][0].transcript); };
+            recognition.onerror = function (event) { setStatus('❌ 识别错误: ' + event.error); };
+            recognition.onend = function () { micBtn.classList.remove('rec'); };
+            recognition.start();
+            setTimeout(() => { try { recognition.stop(); } catch (e) {} }, 5000);
+        }
+
+        inputText.addEventListener('keypress', function (e) { if (e.key === 'Enter') sendText(); });
+    </script>
+</body>
+</html>

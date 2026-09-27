@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # createDatabaseIfNotExist=true：首次启动自动建库 ai_guide，零手工准备
+    url: jdbc:mysql://localhost:3306/ai_guide?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+
+guide:
+  deepseek:
+    # API Key 从环境变量 DEEPSEEK_API_KEY 注入，禁止硬编码入库
+    api-key: ${DEEPSEEK_API_KEY:}
